@@ -19,18 +19,18 @@
     box-sizing: border-box;
 }
 
-body {
-    font-family: 'Inter', sans-serif;
-    background-color: var(--bg-main);
-    color: var(--text-main);
-    height: 100vh;
-    overflow: hidden;
-}
+    body {
+        font-family: 'Inter', sans-serif;
+        background-color: var(--bg-main);
+        color: var(--text-main);
+        min-height: 100vh;
+        overflow-x: hidden;
+    }
 
-.app-container {
-    display: flex;
-    height: 100vh;
-}
+    .app-container {
+        display: flex;
+        min-height: 100vh;
+    }
 
 /* --- Sidebar --- */
 .sidebar {
@@ -481,19 +481,15 @@ header h1 {
 
 /* Estilos para dispositivos móviles */
 @media (max-width: 768px) {
-    .loan-manager {
-        width: 90%;
-        margin: 0 auto;
-    }
-
     .app-container {
         flex-direction: column;
-        height: 100vh;
+        height: auto;
     }
 
     .sidebar {
         width: 100%;
         height: auto;
+        position: relative;
     }
 
     .logo {
@@ -504,8 +500,9 @@ header h1 {
     nav {
         display: flex;
         flex-wrap: wrap;
-        gap: 5px;
+        gap: 8px;
         padding: 0.5rem;
+        justify-content: center;
     }
 
     .nav-btn {
@@ -524,6 +521,8 @@ header h1 {
     .main-content {
         min-width: 0;
         flex: 1;
+        height: auto;
+        overflow-y: visible;
     }
 
     header {

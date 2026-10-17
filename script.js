@@ -211,27 +211,56 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // --- Utilidades ---
+    // ============================================================
+    // 4. LÓGICA DE INTERESES ACUMULADOS
+    // ============================================================
     async function processAutomaticInterests() {
         const today = new Date();
-        const day = today.getDate();
         const todayStr = today.toISOString().split('T')[0];
-        if (day === 15 || day === 30 || day === 31) {
-            for (const loan of loans) {
-                if (loan.lastInterestDate !== todayStr) {
+
+        for (const loan of loans) {
+            if (!loan.lastInterestDate) continue;
+
+            const lastDate = new Date(loan.lastInterestDate);
+            const diffTime = Math.abs(today - lastDate);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            // Si han pasado 15 días o más desde el último interés
+            if (diffDays >= 15) {
+                // Calculamos cuántos periodos de 15 días se han acumulado
+                const periods = Math.floor(diffDays / 15);
+                let totalInterestAccumulated = 0;
+                const historyEntries = [];
+
+                for (let i = 1; i <= periods; i++) {
                     const interestAmount = loan.balance * loan.rate;
-                    const newBalance = loan.balance + interestAmount;
-                    const newHistory = [...(loan.history || [])];
-                    newHistory.push({
+                    totalInterestAccumulated += interestAmount;
+
+                    // Creamos una entrada de historial por cada periodo acumulado
+                    historyEntries.push({
                         type: 'interes',
                         amount: interestAmount,
                         date: new Date().toLocaleString(),
-                        text: `Interés ${(loan.rate * 100)}%: +$${interestAmount.toFixed(2)}`
+                        text: `Interés acumulado periodo ${i}: +$${interestAmount.toFixed(2)}`
                     });
+                }
+
+                if (totalInterestAccumulated > 0) {
+                    const newBalance = loan.balance + totalInterestAccumulated;
+                    const newHistory = [...(loan.history || []), ...historyEntries];
+
                     try {
-                        await setDoc(doc(db, "loans", loan.id), { ...loan, balance: newBalance, lastInterestDate: todayStr, history: newHistory });
-                        await addActivity(`Interés del ${(loan.rate * 100)}% aplicado a ${loan.client}: +$${interestAmount.toFixed(2)}`);
-                    } catch (e) { console.error("Error interés:", e); }
+                        await setDoc(doc(db, "loans", loan.id), {
+                            ...loan,
+                            balance: newBalance,
+                            lastInterestDate: todayStr,
+                            history: newHistory
+                        });
+                        await addActivity(`Intereses acumulados (${periods} periodos) aplicados a ${loan.client}: +$${totalInterestAccumulated.toFixed(2)}`);
+                        console.log(`Se aplicaron ${periods} intereses a ${loan.client}`);
+                    } catch (error) {
+                        console.error("Error al aplicar intereses acumulados:", error);
+                    }
                 }
             }
         }
@@ -246,7 +275,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function updateDate() {
-        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const options = { { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' } };
         const dateEl = document.getElementById('current-date');
         if (dateEl) dateEl.innerText = new Date().toLocaleDateString('es-ES', options);
     }
@@ -276,9 +305,15 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <td style="color: ${loan.balance > 0 ? 'var(--text-main)' : 'var(--success)'}">$${loan.balance.toFixed(2)}</td>
                 <td>${(loan.rate * 100)}%</td>
                 <td>
-                    <button class="btn-action btn-pay" onclick="openPaymentModal('${loan.id}')"><i class="fa-solid fa-hand-holding-dollar"></i> Abono</button>
-                    <button class="btn-action" style="background:#e0e7ff; color:#4338ca;" onclick="viewLoanDetail('${loan.id}')"><i class="fa-solid fa-eye"></i> Detalle</button>
-                    <button class="btn-action btn-delete" onclick="deleteLoan('${loan.id}')"><i class="fa-solid fa-trash"></i></button>
+                    <button class="btn-action btn-pay" onclick="openPaymentModal('${loan.id}')">
+                        <i class="fa-solid fa-hand-holding-dollar"></i> Abono
+                    </button>
+                    <button class="btn-action" style="background:#e0e7ff; color:#4338ca;" onclick="viewLoanDetail('${loan.id}')">
+                        <i class="fa-solid fa-eye"></i> Detalle
+                    </button>
+                    <button class="btn-action btn-delete" onclick="deleteLoan('${loan.id}')">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
                 </td>
             `;
             loansTbody.appendChild(tr);

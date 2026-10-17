@@ -275,7 +275,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function updateDate() {
-        const options = { { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' } };
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
         const dateEl = document.getElementById('current-date');
         if (dateEl) dateEl.innerText = new Date().toLocaleDateString('es-ES', options);
     }

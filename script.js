@@ -11,7 +11,7 @@ import {
     limit
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-document.addEventListener('DOMContentLoaded'), async () => {
+document.addEventListener('DOMContentLoaded', async () => {
 
     // --- Estado de la aplicación ---
     let loans = [];

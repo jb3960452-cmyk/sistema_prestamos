@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor de Préstamos Pro</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fa-solid fa-hand-holding-dollar"></i>
+                <span>LoanManager</span>
+            </div>
+            <nav>
+                <button class="nav-btn active" data-section="dashboard">
+                    <i class="fa-solid fa-chart-line"></i> Panel General
+                </button>
+                <button class="nav-btn" data-section="new-loan">
+                    <i class="fa-solid fa-plus-circle"></i> Nuevo Préstamo
+                </>
+                <button class="nav-btn" data-section="loans-list">
+                    <i class="fa-solid fa-list"></i> Lista de Préstamos
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                <p>v1.1 Detalle de Movimientos</p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header>
+                <h1 id="section-title">Panel General</h1>
+                <div class="user-profile">
+                    <span id="current-date"></span>
+                    <i class="fa-solid fa-circle-user"></i>
+                </div>
+            </header>
+
+            <!-- Section: Dashboard -->
+            <section id="dashboard" class="content-section active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon blue"><i class="fa-solid fa-money-bill-transfer"></i></div>
+                        <div class="stat-info">
+                            <span>Total Prestado</span>
+                            <h2 id="stat-total-amount">$0.00</h2>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon red"><i class="fa-solid fa-clock"></i></div>
+                        <div class="stat-info">
+                            <span>Intereses Pendientes</span>
+                            <h2 id="stat-pending-interest">$0.00</h2>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green"><i class="fa-solid fa-users"></i></div>
+                        <div class="stat-info">
+                            <span>Clientes Activos</span>
+                            <h2 id="stat-active-clients">0</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="recent-activity">
+                    <h3>Movimientos Recientes</h3>
+                    <div class="activity-list" id="activity-log">
+                        <p class="empty-msg">No hay actividad reciente.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section: New Loan -->
+            <section id="new-loan" class="content-section">
+                <div class="form-container">
+                    <form id="loan-form">
+                        <div class="form-group">
+                            <label>Nombre del Cliente</label>
+                            <input type="text" id="client-name" required placeholder="Ej. Juan Pérez">
+                        </div>
+                        <div class="form-group">
+                            <label>Monto del Préstamo</label>
+                            <input type="number" id="loan-amount" required placeholder="0.00" step="0.01">
+                        </div>
+                        <div class="form-group">
+                            <label>Tasa de Interés</label>
+                            <select id="interest-rate">
+                                <option value="0.10">10% (Preferencial)</option>
+                                <option value="0.05">5% (Básico)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Fecha de Inicio</label>
+                            <input type="date" id="loan-date" required>
+                        </div>
+                        <button type="submit" class="btn-submit">Crear Préstamo</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Section: Loans List -->
+            <section id="loans-list" class="content-section">
+                <div class="table-container">
+                    <div class="table-actions">
+                        <input type="text" id="search-loan" placeholder="Buscar cliente...">
+                    </div>
+                    <table class="loans-table">
+                        <thead>
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Fecha Creación</th>
+                                <th>Monto Inicial</th>
+                                <th>Saldo Actual</th>
+                                <th>Interés</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="loans-tbody">
+                            <!-- Loans will be injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal Abono -->
+    <div id="payment-modal" class="modal">
+        <div class="modal-content">
+            <h3>Realizar Abono</h3>
+            <p id="modal-client-name"></p>
+            <form id="payment-form">
+                <input type="hidden" id="payment-loan-id">
+                <div class="form-group">
+                    <label>Monto del Abono</label>
+                    <input type="number" id="payment-amount" required step="0.01">
+                </div>
+                <div class="modal-btns">
+                    <button type="button" class="btn-cancel" id="close-modal">Cancelar</button>
+                    <button type="submit" class="btn-submit">Aplicar Abono</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Detalle de Movimientos -->
+    <div id="detail-modal" class="modal">
+        <div class="modal-content detail-modal-content">
+            <h3>Historial del Préstamo</h3>
+            <p id="detail-client-name"></p>
+            <div class="detail-summary">
+                <div class="summary-item">
+                    <span>Monto Inicial:</span> <strong id="detail-initial"></strong>
+                </div>
+                <div class="summary-item">
+                    <span>Tasa Interés:</span> <strong id="detail-rate"></strong>
+                </div>
+                <div class="summary-item">
+                    <span>Saldo Actual:</span> <strong id="detail-balance"></strong>
+                </div>
+            </div>
+            <div class="detail-history">
+                <h4>Movimientos</h4>
+                <ul id="detail-history-list">
+                    <!-- History items go here -->
+                </ul>
+            </div>
+            <div class="modal-btns">
+                <button type="button" class="btn-cancel" id="close-detail">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

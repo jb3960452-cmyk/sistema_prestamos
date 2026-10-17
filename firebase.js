@@ -1,18 +1,14 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-// Este objeto lo copias desde la sección "Configuración del proyecto" en la consola
 const firebaseConfig = {
-  apiKey: "TU_API_KEY",
+  apiKey: "AIzaSyDy9bIIr_ZUKOlf9F_eDSOQ6vIICRP7TKg",
   authDomain: "sistema-de-ingresos-54bd2.firebaseapp.com",
   projectId: "sistema-de-ingresos-54bd2",
-  storageBucket: "sistema-de-ingresos-54bd2.appspot.com",
+  storageBucket: "sistema-de-ingresos-54bd2.firebasestorage.app",
   messagingSenderId: "645109122445",
-  appId: "TU_APP_ID"
+  appId: "1:645109122445:web:143f819d6d29741aeee9c4"
 };
 
-// Inicializar Firebase
 const app = initializeApp(firebaseConfig);
-
-// Inicializar Cloud Firestore y obtener una referencia al servicio
 export const db = getFirestore(app);

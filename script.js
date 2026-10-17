@@ -1,9 +1,22 @@
-document.addEventListener('DOMContentLoaded', () => {
+import { db } from './firebase.js';
+import {
+    collection,
+    doc,
+    getDocs,
+    setDoc,
+    deleteDoc,
+    onSnapshot,
+    query,
+    orderBy,
+    limit
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+document.addEventListener('DOMContentLoaded'), async () => {
+
     // --- Estado de la aplicación ---
-    let loans = JSON.parse(localStorage.getItem('loans')) || [];
-    let activities = JSON.parse(localStorage.getItem('loan_activities')) || [];
-    // Nueva estructura para guardar el historial detallado de cada préstamo
-    let loanHistories = JSON.parse(localStorage.getItem('loan_histories')) || {};
+    let loans = [];
+    let activities = [];
+    let loanHistories = {};
 
     // Elementos del DOM
     const navBtns = document.querySelectorAll('.nav-btn');
@@ -15,17 +28,46 @@ document.addEventListener('DOMContentLoaded', () => {
     const paymentForm = document.getElementById('payment-form');
     const activityLog = document.getElementById('activity-log');
     const searchInput = document.getElementById('search-loan');
-
-    // Elementos Modal Detalle
     const detailModal = document.getElementById('detail-modal');
     const detailHistoryList = document.getElementById('detail-history-list');
+
+    // --- Cargar datos desde Firebase en tiempo real ---
+    // Escuchar préstamos
+    onSnapshot(collection(db, "loans"), (snapshot) => {
+        loans = [];
+        loanHistories = {};
+
+        snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            loans.push({
+                id: docSnap.id,
+                ...data
+            });
+            if (data.history) {
+                loanHistories[docSnap.id] = data.history;
+            }
+        });
+
+        updateDashboard();
+        renderLoans(searchInput.value);
+    });
+
+    // Escuchar actividades
+    const activitiesQuery = query(collection(db, "activities"), orderBy("date", "desc"), limit(20));
+    onSnapshot(activitiesQuery, (snapshot) => {
+        activities = [];
+        snapshot.forEach((docSnap) => {
+            activities.push({
+                id: docSnap.id,
+                ...docSnap.data()
+            });
+        });
+        renderActivities();
+    });
 
     // --- Inicialización ---
     updateDate();
     processAutomaticInterests();
-    updateDashboard();
-    renderLoans();
-    renderActivities();
 
     // --- Navegación ---
     navBtns.forEach(btn => {
@@ -40,41 +82,40 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Gestión de Préstamos ---
-    loanForm.addEventListener('submit', (e) => {
+    loanForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
+        const id = Date.now().toString();
         const newLoan = {
-            id: Date.now(),
             client: document.getElementById('client-name').value,
             initialAmount: parseFloat(document.getElementById('loan-amount').value),
             balance: parseFloat(document.getElementById('loan-amount').value),
             rate: parseFloat(document.getElementById('interest-rate').value),
             date: document.getElementById('loan-date').value,
-            lastInterestDate: new Date().toISOString().split('T')[0]
+            lastInterestDate: new Date().toISOString().split('T')[0],
+            history: [{
+                type: 'creacion',
+                amount: parseFloat(document.getElementById('loan-amount').value),
+                date: new Date().toLocaleString(),
+                text: `Préstamo creado por $${parseFloat(document.getElementById('loan-amount').value).toFixed(2)}`
+            }]
         };
 
-        loans.push(newLoan);
-
-        // Inicializar historial para este préstamo
-        loanHistories[newLoan.id] = [{
-            type: 'creacion',
-            amount: newLoan.initialAmount,
-            date: new Date().toLocaleString(),
-            text: `Préstamo creado por $${newLoan.initialAmount.toFixed(2)}`
-        }];
-
-        saveData();
-        addActivity(`Nuevo préstamo creado para ${newLoan.client} por $${newLoan.initialAmount.toFixed(2)}`);
-        loanForm.reset();
-        alert('Préstamo creado exitosamente');
-        updateDashboard();
-        renderLoans();
-        renderActivities();
+        try {
+            await setDoc(doc(db, "loans", id), newLoan);
+            await addActivity(`Nuevo préstamo creado para ${newLoan.client} por $${newLoan.initialAmount.toFixed(2)}`);
+            loanForm.reset();
+            alert('Préstamo creado exitosamente');
+        } catch (error) {
+            console.error("Error al crear préstamo:", error);
+            alert("Error al guardar el préstamo");
+        }
     });
 
     // --- Gestión de Abonos ---
     window.openPaymentModal = (id) => {
         const loan = loans.find(l => l.id === id);
+        if (!loan) return;
         document.getElementById('payment-loan-id').value = id;
         document.getElementById('modal-client-name').innerText = `Cliente: ${loan.client}`;
         paymentModal.classList.add('active');
@@ -84,52 +125,57 @@ document.addEventListener('DOMContentLoaded', () => {
         paymentModal.classList.remove('active');
     });
 
-    paymentForm.addEventListener('submit', (e) => {
+    paymentForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const id = parseInt(document.getElementById('payment-loan-id').value);
+        const id = document.getElementById('payment-loan-id').value;
         const amount = parseFloat(document.getElementById('payment-amount').value);
 
-        const loanIndex = loans.findIndex(l => l.id === id);
-        if (loanIndex !== -1) {
-            const loan = loans[loanIndex];
-            loan.balance -= amount;
+        const loan = loans.find(l => l.id === id);
+        if (!loan) return;
 
-            // Agregar al historial detallado
-            if (!loanHistories[id]) loanHistories[id] = [];
-            loanHistories[id].push({
-                type: 'abono',
-                amount: -amount,
-                date: new Date().toLocaleString(),
-                text: `Abono realizado: -$${amount.toFixed(2)}`
+        const newBalance = loan.balance - amount;
+        const newHistory = [...(loan.history || [])];
+        newHistory.push({
+            type: 'abono',
+            amount: -amount,
+            date: new Date().toLocaleString(),
+            text: `Abono realizado: -$${amount.toFixed(2)}`
+        });
+
+        try {
+            await setDoc(doc(db, "loans", id), {
+                ...loan,
+                balance: newBalance,
+                history: newHistory
             });
-
-            addActivity(`Abono de $${amount.toFixed(2)} realizado a ${loan.client}`);
-            saveData();
+            await addActivity(`Abono de $${amount.toFixed(2)} realizado a ${loan.client}`);
             paymentModal.classList.remove('active');
             paymentForm.reset();
-            updateDashboard();
-            renderLoans();
-            renderActivities();
+        } catch (error) {
+            console.error("Error al realizar abono:", error);
+            alert("Error al guardar el abono");
         }
     });
 
-    window.deleteLoan = (id) => {
+    window.deleteLoan = async (id) => {
         if (confirm('¿Estás seguro de eliminar este préstamo?')) {
             const loan = loans.find(l => l.id === id);
-            addActivity(`Préstamo de ${loan.client} eliminado`);
-            loans = loans.filter(l => l.id !== id);
-            delete loanHistories[id];
-            saveData();
-            updateDashboard();
-            renderLoans();
-            renderActivities();
+            try {
+                await deleteDoc(doc(db, "loans", id));
+                await addActivity(`Préstamo de ${loan.client} eliminado`);
+            } catch (error) {
+                console.error("Error al eliminar:", error);
+                alert("Error al eliminar el préstamo");
+            }
         }
     };
 
     // --- Detalle del Préstamo ---
     window.viewLoanDetail = (id) => {
         const loan = loans.find(l => l.id === id);
-        const history = loanHistories[id] || [];
+        if (!loan) return;
+
+        const history = loan.history || [];
 
         document.getElementById('detail-client-name').innerText = `Cliente: ${loan.client}`;
         document.getElementById('detail-initial').innerText = `$${loan.initialAmount.toFixed(2)}`;
@@ -154,59 +200,52 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Lógica de Intereses Automáticos ---
-    function processAutomaticInterests() {
+    async function processAutomaticInterests() {
         const today = new Date();
         const day = today.getDate();
         const todayStr = today.toISOString().split('T')[0];
 
-        if (day === 15 || day === 30 || (day === 31)) {
-            let interestAppliedCount = 0;
-
-            loans.forEach(loan => {
+        if (day === 15 || day === 30 || day === 31) {
+            for (const loan of loans) {
                 if (loan.lastInterestDate !== todayStr) {
                     const interestAmount = loan.balance * loan.rate;
-                    loan.balance += interestAmount;
-                    loan.lastInterestDate = todayStr;
-                    interestAppliedCount++;
-
-                    // Agregar al historial detallado
-                    if (!loanHistories[loan.id]) loanHistories[loan.id] = [];
-                    loanHistories[loan.id].push({
+                    const newBalance = loan.balance + interestAmount;
+                    const newHistory = [...(loan.history || [])];
+                    newHistory.push({
                         type: 'interes',
                         amount: interestAmount,
                         date: new Date().toLocaleString(),
                         text: `Interés ${(loan.rate * 100)}%: +$${interestAmount.toFixed(2)}`
                     });
 
-                    addActivity(`Interés del ${(loan.rate * 100)}% aplicado a ${loan.client}: +$${interestAmount.toFixed(2)}`);
+                    try {
+                        await setDoc(doc(db, "loans", loan.id), {
+                            ...loan,
+                            balance: newBalance,
+                            lastInterestDate: todayStr,
+                            history: newHistory
+                        });
+                        await addActivity(`Interés del ${(loan.rate * 100)}% aplicado a ${loan.client}: +$${interestAmount.toFixed(2)}`);
+                    } catch (error) {
+                        console.error("Error al aplicar interés:", error);
+                    }
                 }
-            });
-
-            if (interestAppliedCount > 0) {
-                saveData();
-                updateDashboard();
-                renderLoans();
-                renderActivities();
             }
         }
     }
 
     // --- Utilidades ---
-    function saveData() {
-        localStorage.setItem('loans', JSON.stringify(loans));
-        localStorage.setItem('loan_activities', JSON.stringify(activities));
-        localStorage.setItem('loan_histories', JSON.stringify(loanHistories));
-    }
-
-    function addActivity(msg) {
+    async function addActivity(msg) {
+        const id = Date.now().toString();
         const entry = {
-            id: Date.now(),
             text: msg,
             date: new Date().toLocaleString()
         };
-        activities.unshift(entry);
-        if (activities.length > 20) activities.pop();
-        saveData();
+        try {
+            await setDoc(doc(db, "activities", id), entry);
+        } catch (error) {
+            console.error("Error al guardar actividad:", error);
+        }
     }
 
     function updateDate() {
@@ -215,12 +254,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateDashboard() {
-        const total = loans.reduce((sum, l) => sum + l.balance, 0);
+        const total = loans.reduce((sum, l) => sum + (l.balance || 0), 0);
         const activeClients = loans.length;
-        document.getElementById('stat-total-amount').innerText = `$${total.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+        document.getElementById('stat-total-amount').innerText = `$${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
         document.getElementById('stat-active-clients').innerText = activeClients;
-        const pending = loans.reduce((sum, l) => sum + (l.balance * l.rate), 0);
-        document.getElementById('stat-pending-interest').innerText = `$${pending.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+        const pending = loans.reduce((sum, l) => sum + ((l.balance || 0) * (l.rate || 0)), 0);
+        document.getElementById('stat-pending-interest').innerText = `$${pending.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
     }
 
     function renderLoans(filter = '') {
@@ -238,13 +277,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 </td>
                 <td>${(loan.rate * 100)}%</td>
                 <td>
-                    <button class="btn-action btn-pay" onclick="openPaymentModal(${loan.id})">
+                    <button class="btn-action btn-pay" onclick="openPaymentModal('${loan.id}')">
                         <i class="fa-solid fa-hand-holding-dollar"></i> Abono
                     </button>
-                    <button class="btn-action" style="background:#e0e7ff; color:#4338ca;" onclick="viewLoanDetail(${loan.id})">
+                    <button class="btn-action" style="background:#e0e7ff; color:#4338ca;" onclick="viewLoanDetail('${loan.id}')">
                         <i class="fa-solid fa-eye"></i> Detalle
                     </button>
-                    <button class="btn-action btn-delete" onclick="deleteLoan(${loan.id})">
+                    <button class="btn-action btn-delete" onclick="deleteLoan('${loan.id}')">
                         <i class="fa-solid fa-trash"></i>
                     </button>
                 </td>
@@ -278,4 +317,4 @@ document.addEventListener('DOMContentLoaded', () => {
     searchInput.addEventListener('input', (e) => {
         renderLoans(e.target.value);
     });
-});
+};

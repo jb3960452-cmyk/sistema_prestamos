@@ -19,7 +19,7 @@
     box-sizing: border-box;
 }
 
-    body {
+    body {  
         font-family: 'Inter', sans-serif;
         background-color: var(--bg-main);
         color: var(--text-main);

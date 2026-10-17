@@ -331,4 +331,4 @@ const dateEl = $('current-date');
 if (dateEl) {
     dateEl.innerText = new Date().toLocaleDateString('es-ES',
         { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-}
+};
